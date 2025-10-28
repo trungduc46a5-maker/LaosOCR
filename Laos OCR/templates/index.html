@@ -8,13 +8,20 @@
 </head>
 <body>
     <div class="container">
-        <h1>🇱🇦 Laos OCR Pro</h1>
-        <p>Kéo thả PDF hoặc ảnh (PNG, JPG) để nhận diện chữ tiếng Lào</p>
+        <!-- Language Switcher -->
+        <div class="language-switcher">
+            <button class="lang-btn" data-lang="vi" onclick="changeLanguage('vi')">🇻🇳 Tiếng Việt</button>
+            <button class="lang-btn" data-lang="en" onclick="changeLanguage('en')">🇬🇧 English</button>
+            <button class="lang-btn" data-lang="lo" onclick="changeLanguage('lo')">🇱🇦 ລາວ</button>
+        </div>
+
+        <h1 data-i18n="title">🇱🇦 Laos OCR Pro</h1>
+        <p data-i18n="subtitle">Kéo thả PDF hoặc ảnh (PNG, JPG) để nhận diện chữ tiếng Lào</p>
         
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('upload')">📤 Upload</button>
-            <button class="tab-btn" onclick="switchTab('history')">📚 Lịch sử</button>
+            <button class="tab-btn active" onclick="switchTab('upload')" data-i18n="tabUpload">📤 Upload</button>
+            <button class="tab-btn" onclick="switchTab('history')" data-i18n="tabHistory">📚 Lịch sử</button>
         </div>
 
         <!-- Tab Upload -->
@@ -27,10 +34,10 @@
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    <h3>Kéo thả nhiều file vào đây</h3>
-                    <p class="supported-formats">PDF, PNG, JPG, JPEG, GIF, BMP, WEBP</p>
-                    <p>hoặc</p>
-                    <button onclick="document.getElementById('fileInput').click()" class="btn">
+                    <h3 data-i18n="dropTitle">Kéo thả nhiều file vào đây</h3>
+                    <p class="supported-formats" data-i18n="supportedFormats">PDF, PNG, JPG, JPEG, GIF, BMP, WEBP</p>
+                    <p data-i18n="orText">hoặc</p>
+                    <button onclick="document.getElementById('fileInput').click()" class="btn" data-i18n="chooseFile">
                         Chọn file
                     </button>
                     <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp,.webp" multiple style="display: none;">
@@ -39,15 +46,15 @@
 
             <!-- File Queue -->
             <div id="fileQueue" class="file-queue" style="display: none;">
-                <h3>📋 File đang chờ xử lý (<span id="queueCount">0</span>)</h3>
+                <h3><span data-i18n="queueTitle">📋 File đang chờ xử lý</span> (<span id="queueCount">0</span>)</h3>
                 <div id="queueList"></div>
-                <button onclick="processAllFiles()" class="btn btn-process">🚀 Xử lý tất cả</button>
+                <button onclick="processAllFiles()" class="btn btn-process" data-i18n="processAll">🚀 Xử lý tất cả</button>
             </div>
 
             <!-- Loading -->
             <div id="loading" class="loading" style="display: none;">
                 <div class="spinner"></div>
-                <p>Đang xử lý <span id="currentFile">0</span>/<span id="totalFiles">0</span> file...</p>
+                <p><span data-i18n="processing">Đang xử lý</span> <span id="currentFile">0</span>/<span id="totalFiles">0</span> <span data-i18n="filesText">file...</span></p>
                 <div class="progress-bar">
                     <div id="progressFill" class="progress-fill"></div>
                 </div>
@@ -55,10 +62,10 @@
 
             <!-- Kết quả -->
             <div id="results" class="results" style="display: none;">
-                <h2>✅ Kết quả OCR</h2>
+                <h2 data-i18n="resultsTitle">✅ Kết quả OCR</h2>
                 <div class="result-summary">
-                    <span>Đã xử lý: <strong id="processedCount">0</strong> file</span>
-                    <button onclick="downloadAllResults()" class="btn">📥 Tải xuống tất cả</button>
+                    <span><span data-i18n="processed">Đã xử lý:</span> <strong id="processedCount">0</strong> file</span>
+                    <button onclick="downloadAllResults()" class="btn" data-i18n="downloadAll">📥 Tải xuống tất cả</button>
                 </div>
                 <div id="filesContainer"></div>
             </div>
@@ -67,15 +74,16 @@
         <!-- Tab History -->
         <div id="historyTab" class="tab-content">
             <div class="history-header">
-                <h2>📚 Lịch sử xử lý</h2>
-                <button onclick="loadHistory()" class="btn-small">🔄 Làm mới</button>
+                <h2 data-i18n="historyTitle">📚 Lịch sử xử lý</h2>
+                <button onclick="loadHistory()" class="btn-small" data-i18n="refresh">🔄 Làm mới</button>
             </div>
             <div id="historyList" class="history-list">
-                <p>Đang tải...</p>
+                <p data-i18n="loading">Đang tải...</p>
             </div>
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='translations.js') }}"></script>
     <script>
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
@@ -163,7 +171,6 @@
         async function processAllFiles() {
             if (selectedFiles.length === 0) return;
 
-            // Hiển thị loading
             fileQueue.style.display = 'none';
             dropZone.style.display = 'none';
             loading.style.display = 'block';
@@ -188,11 +195,11 @@
                     processedResults = data.results;
                     displayResults();
                 } else {
-                    alert('Lỗi: ' + (data.error || 'Không xác định'));
+                    alert(t('error') + ': ' + (data.error || t('error')));
                     resetUI();
                 }
             } catch (error) {
-                alert('Lỗi kết nối: ' + error);
+                alert(t('connectionError') + ': ' + error);
                 resetUI();
             }
         }
@@ -222,7 +229,7 @@
                     fileContent = `
                         <div class="file-header">
                             <h3>${result.file_type === 'PDF' ? '📄' : '🖼️'} ${result.filename}</h3>
-                            <span class="file-type">${result.file_type} - ${result.total_pages} trang</span>
+                            <span class="file-type">${result.file_type} - ${result.total_pages} ${t('pages')}</span>
                         </div>
                     `;
                     
@@ -230,15 +237,15 @@
                         fileContent += `
                             <div class="page-result">
                                 <div class="page-header">
-                                    <h4>Trang ${page.page}</h4>
+                                    <h4>${t('page')} ${page.page}</h4>
                                 </div>
                                 <div class="page-content">
                                     <div class="page-preview">
-                                        <img src="${page.preview}" alt="Trang ${page.page}">
+                                        <img src="${page.preview}" alt="${t('page')} ${page.page}">
                                     </div>
                                     <div class="page-text">
                                         <textarea readonly>${page.text}</textarea>
-                                        <button onclick="copyText(this)" class="btn-small">📋 Copy</button>
+                                        <button onclick="copyText(this)" class="btn-small" data-copy="${t('copyBtn')}" data-copied="${t('copied')}">${t('copyBtn')}</button>
                                     </div>
                                 </div>
                             </div>
@@ -255,9 +262,11 @@
             const textarea = button.previousElementSibling;
             textarea.select();
             document.execCommand('copy');
-            button.textContent = '✅ Đã copy!';
+            const copiedText = button.getAttribute('data-copied');
+            const originalText = button.getAttribute('data-copy');
+            button.textContent = copiedText;
             setTimeout(() => {
-                button.textContent = '📋 Copy';
+                button.textContent = originalText;
             }, 2000);
         }
 
@@ -272,7 +281,7 @@
                     allText += `${'='.repeat(60)}\n\n`;
                     
                     result.pages.forEach(page => {
-                        allText += `--- Trang ${page.page} ---\n${page.text}\n\n`;
+                        allText += `--- ${t('page')} ${page.page} ---\n${page.text}\n\n`;
                     });
                 }
             });
@@ -288,14 +297,14 @@
         // History functions
         async function loadHistory() {
             const historyList = document.getElementById('historyList');
-            historyList.innerHTML = '<p>Đang tải...</p>';
+            historyList.innerHTML = `<p>${t('loading')}</p>`;
             
             try {
                 const response = await fetch('/history');
                 const data = await response.json();
                 
                 if (data.history.length === 0) {
-                    historyList.innerHTML = '<p class="empty-history">Chưa có lịch sử xử lý</p>';
+                    historyList.innerHTML = `<p class="empty-history">${t('emptyHistory')}</p>`;
                     return;
                 }
                 
@@ -306,24 +315,24 @@
                     historyItem.className = 'history-item';
                     
                     const date = new Date(item.created_at);
-                    const formattedDate = date.toLocaleString('vi-VN');
+                    const formattedDate = date.toLocaleString(currentLanguage === 'vi' ? 'vi-VN' : currentLanguage === 'lo' ? 'lo-LA' : 'en-US');
                     
                     historyItem.innerHTML = `
                         <div class="history-info">
                             <h4>${item.file_type === 'PDF' ? '📄' : '🖼️'} ${item.filename}</h4>
-                            <p>${item.file_type} - ${item.total_pages} trang</p>
+                            <p>${item.file_type} - ${item.total_pages} ${t('pages')}</p>
                             <span class="history-date">⏰ ${formattedDate}</span>
                         </div>
                         <div class="history-actions">
-                            <button onclick="viewHistory(${item.id})" class="btn-small">👁️ Xem</button>
-                            <button onclick="deleteHistory(${item.id})" class="btn-small btn-danger">🗑️ Xóa</button>
+                            <button onclick="viewHistory(${item.id})" class="btn-small">${t('viewBtn')}</button>
+                            <button onclick="deleteHistory(${item.id})" class="btn-small btn-danger">${t('deleteBtn')}</button>
                         </div>
                     `;
                     
                     historyList.appendChild(historyItem);
                 });
             } catch (error) {
-                historyList.innerHTML = '<p class="error-message">Lỗi tải lịch sử: ' + error + '</p>';
+                historyList.innerHTML = `<p class="error-message">${t('loadHistoryError')}: ${error}</p>`;
             }
         }
 
@@ -334,12 +343,12 @@
                 
                 alert(`File: ${data.filename}\nText:\n\n${data.full_text.substring(0, 500)}...`);
             } catch (error) {
-                alert('Lỗi: ' + error);
+                alert(t('error') + ': ' + error);
             }
         }
 
         async function deleteHistory(id) {
-            if (!confirm('Bạn có chắc muốn xóa bản ghi này?')) return;
+            if (!confirm(t('deleteConfirm'))) return;
             
             try {
                 const response = await fetch(`/delete-history/${id}`, {
@@ -349,10 +358,10 @@
                 if (response.ok) {
                     loadHistory();
                 } else {
-                    alert('Lỗi xóa bản ghi');
+                    alert(t('deleteError'));
                 }
             } catch (error) {
-                alert('Lỗi: ' + error);
+                alert(t('error') + ': ' + error);
             }
         }
 
@@ -362,14 +371,6 @@
             loading.style.display = 'none';
             results.style.display = 'none';
             selectedFiles = [];
-        }
-
-        // Auto-update progress
-        let processedCount = 0;
-        function updateProgress() {
-            document.getElementById('currentFile').textContent = processedCount;
-            const percent = (processedCount / selectedFiles.length) * 100;
-            document.getElementById('progressFill').style.width = percent + '%';
         }
     </script>
 </body>
