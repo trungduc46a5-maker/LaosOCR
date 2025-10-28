@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laos OCR - Nhận diện chữ PDF & Ảnh</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>🇱🇦 Laos OCR Pro</h1>
+        <p>Kéo thả PDF hoặc ảnh (PNG, JPG) để nhận diện chữ tiếng Lào</p>
+        
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('upload')">📤 Upload</button>
+            <button class="tab-btn" onclick="switchTab('history')">📚 Lịch sử</button>
+        </div>
+
+        <!-- Tab Upload -->
+        <div id="uploadTab" class="tab-content active">
+            <!-- Khu vực kéo thả -->
+            <div id="dropZone" class="drop-zone">
+                <div class="drop-content">
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <h3>Kéo thả nhiều file vào đây</h3>
+                    <p class="supported-formats">PDF, PNG, JPG, JPEG, GIF, BMP, WEBP</p>
+                    <p>hoặc</p>
+                    <button onclick="document.getElementById('fileInput').click()" class="btn">
+                        Chọn file
+                    </button>
+                    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp,.webp" multiple style="display: none;">
+                </div>
+            </div>
+
+            <!-- File Queue -->
+            <div id="fileQueue" class="file-queue" style="display: none;">
+                <h3>📋 File đang chờ xử lý (<span id="queueCount">0</span>)</h3>
+                <div id="queueList"></div>
+                <button onclick="processAllFiles()" class="btn btn-process">🚀 Xử lý tất cả</button>
+            </div>
+
+            <!-- Loading -->
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Đang xử lý <span id="currentFile">0</span>/<span id="totalFiles">0</span> file...</p>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+            </div>
+
+            <!-- Kết quả -->
+            <div id="results" class="results" style="display: none;">
+                <h2>✅ Kết quả OCR</h2>
+                <div class="result-summary">
+                    <span>Đã xử lý: <strong id="processedCount">0</strong> file</span>
+                    <button onclick="downloadAllResults()" class="btn">📥 Tải xuống tất cả</button>
+                </div>
+                <div id="filesContainer"></div>
+            </div>
+        </div>
+
+        <!-- Tab History -->
+        <div id="historyTab" class="tab-content">
+            <div class="history-header">
+                <h2>📚 Lịch sử xử lý</h2>
+                <button onclick="loadHistory()" class="btn-small">🔄 Làm mới</button>
+            </div>
+            <div id="historyList" class="history-list">
+                <p>Đang tải...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileQueue = document.getElementById('fileQueue');
+        const queueList = document.getElementById('queueList');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const filesContainer = document.getElementById('filesContainer');
+        
+        let selectedFiles = [];
+        let processedResults = [];
+
+        // Switch tabs
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            if (tab === 'upload') {
+                document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+                document.getElementById('uploadTab').classList.add('active');
+            } else {
+                document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+                document.getElementById('historyTab').classList.add('active');
+                loadHistory();
+            }
+        }
+
+        // Drag & Drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
+            displayFileQueue();
+        }
+
+        function displayFileQueue() {
+            if (selectedFiles.length === 0) return;
+
+            fileQueue.style.display = 'block';
+            document.getElementById('queueCount').textContent = selectedFiles.length;
+            queueList.innerHTML = '';
+
+            selectedFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'queue-item';
+                
+                const fileExt = file.name.split('.').pop().toUpperCase();
+                const fileIcon = fileExt === 'PDF' ? '📄' : '🖼️';
+                
+                fileItem.innerHTML = `
+                    <span>${fileIcon} ${file.name}</span>
+                    <span class="file-size">${(file.size / 1024).toFixed(1)} KB</span>
+                    <button onclick="removeFile(${index})" class="btn-remove">❌</button>
+                `;
+                queueList.appendChild(fileItem);
+            });
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            if (selectedFiles.length === 0) {
+                fileQueue.style.display = 'none';
+            } else {
+                displayFileQueue();
+            }
+        }
+
+        async function processAllFiles() {
+            if (selectedFiles.length === 0) return;
+
+            // Hiển thị loading
+            fileQueue.style.display = 'none';
+            dropZone.style.display = 'none';
+            loading.style.display = 'block';
+            results.style.display = 'none';
+
+            document.getElementById('totalFiles').textContent = selectedFiles.length;
+            
+            const formData = new FormData();
+            selectedFiles.forEach(file => {
+                formData.append('files[]', file);
+            });
+
+            try {
+                const response = await fetch('/upload-multiple', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    processedResults = data.results;
+                    displayResults();
+                } else {
+                    alert('Lỗi: ' + (data.error || 'Không xác định'));
+                    resetUI();
+                }
+            } catch (error) {
+                alert('Lỗi kết nối: ' + error);
+                resetUI();
+            }
+        }
+
+        function displayResults() {
+            loading.style.display = 'none';
+            results.style.display = 'block';
+            filesContainer.innerHTML = '';
+            
+            document.getElementById('processedCount').textContent = processedResults.length;
+
+            processedResults.forEach((result, fileIndex) => {
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'file-result';
+                
+                let fileContent = '';
+                
+                if (result.error) {
+                    fileContent = `
+                        <div class="file-header error">
+                            <h3>❌ ${result.filename}</h3>
+                            <span class="file-type">${result.file_type}</span>
+                        </div>
+                        <div class="error-message">${result.error}</div>
+                    `;
+                } else {
+                    fileContent = `
+                        <div class="file-header">
+                            <h3>${result.file_type === 'PDF' ? '📄' : '🖼️'} ${result.filename}</h3>
+                            <span class="file-type">${result.file_type} - ${result.total_pages} trang</span>
+                        </div>
+                    `;
+                    
+                    result.pages.forEach(page => {
+                        fileContent += `
+                            <div class="page-result">
+                                <div class="page-header">
+                                    <h4>Trang ${page.page}</h4>
+                                </div>
+                                <div class="page-content">
+                                    <div class="page-preview">
+                                        <img src="${page.preview}" alt="Trang ${page.page}">
+                                    </div>
+                                    <div class="page-text">
+                                        <textarea readonly>${page.text}</textarea>
+                                        <button onclick="copyText(this)" class="btn-small">📋 Copy</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                fileDiv.innerHTML = fileContent;
+                filesContainer.appendChild(fileDiv);
+            });
+        }
+
+        function copyText(button) {
+            const textarea = button.previousElementSibling;
+            textarea.select();
+            document.execCommand('copy');
+            button.textContent = '✅ Đã copy!';
+            setTimeout(() => {
+                button.textContent = '📋 Copy';
+            }, 2000);
+        }
+
+        function downloadAllResults() {
+            let allText = '';
+            
+            processedResults.forEach(result => {
+                if (!result.error) {
+                    allText += `\n${'='.repeat(60)}\n`;
+                    allText += `FILE: ${result.filename}\n`;
+                    allText += `TYPE: ${result.file_type}\n`;
+                    allText += `${'='.repeat(60)}\n\n`;
+                    
+                    result.pages.forEach(page => {
+                        allText += `--- Trang ${page.page} ---\n${page.text}\n\n`;
+                    });
+                }
+            });
+
+            const blob = new Blob([allText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ocr_results_${Date.now()}.txt`;
+            a.click();
+        }
+
+        // History functions
+        async function loadHistory() {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = '<p>Đang tải...</p>';
+            
+            try {
+                const response = await fetch('/history');
+                const data = await response.json();
+                
+                if (data.history.length === 0) {
+                    historyList.innerHTML = '<p class="empty-history">Chưa có lịch sử xử lý</p>';
+                    return;
+                }
+                
+                historyList.innerHTML = '';
+                
+                data.history.forEach(item => {
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+                    
+                    const date = new Date(item.created_at);
+                    const formattedDate = date.toLocaleString('vi-VN');
+                    
+                    historyItem.innerHTML = `
+                        <div class="history-info">
+                            <h4>${item.file_type === 'PDF' ? '📄' : '🖼️'} ${item.filename}</h4>
+                            <p>${item.file_type} - ${item.total_pages} trang</p>
+                            <span class="history-date">⏰ ${formattedDate}</span>
+                        </div>
+                        <div class="history-actions">
+                            <button onclick="viewHistory(${item.id})" class="btn-small">👁️ Xem</button>
+                            <button onclick="deleteHistory(${item.id})" class="btn-small btn-danger">🗑️ Xóa</button>
+                        </div>
+                    `;
+                    
+                    historyList.appendChild(historyItem);
+                });
+            } catch (error) {
+                historyList.innerHTML = '<p class="error-message">Lỗi tải lịch sử: ' + error + '</p>';
+            }
+        }
+
+        async function viewHistory(id) {
+            try {
+                const response = await fetch(`/history/${id}`);
+                const data = await response.json();
+                
+                alert(`File: ${data.filename}\nText:\n\n${data.full_text.substring(0, 500)}...`);
+            } catch (error) {
+                alert('Lỗi: ' + error);
+            }
+        }
+
+        async function deleteHistory(id) {
+            if (!confirm('Bạn có chắc muốn xóa bản ghi này?')) return;
+            
+            try {
+                const response = await fetch(`/delete-history/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    loadHistory();
+                } else {
+                    alert('Lỗi xóa bản ghi');
+                }
+            } catch (error) {
+                alert('Lỗi: ' + error);
+            }
+        }
+
+        function resetUI() {
+            dropZone.style.display = 'flex';
+            fileQueue.style.display = 'none';
+            loading.style.display = 'none';
+            results.style.display = 'none';
+            selectedFiles = [];
+        }
+
+        // Auto-update progress
+        let processedCount = 0;
+        function updateProgress() {
+            document.getElementById('currentFile').textContent = processedCount;
+            const percent = (processedCount / selectedFiles.length) * 100;
+            document.getElementById('progressFill').style.width = percent + '%';
+        }
+    </script>
+</body>
+</html>
